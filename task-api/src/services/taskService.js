@@ -2,12 +2,16 @@ const { v4: uuidv4 } = require('uuid');
 
 let tasks = [];
 
+const UPDATABLE_FIELDS = ['title', 'description', 'status', 'priority', 'dueDate'];
+
 const getAll = () => [...tasks];
 
 const findById = (id) => tasks.find((t) => t.id === id);
 
-const getByStatus = (status) => tasks.filter((t) => t.status.includes(status));
+// FIX: exact match instead of substring match
+const getByStatus = (status) => tasks.filter((t) => t.status === status);
 
+// FIX: pages are 1-indexed
 const getPaginated = (page, limit) => {
   const offset = (page - 1) * limit;
   return tasks.slice(offset, offset + limit);
@@ -43,11 +47,17 @@ const create = ({ title, description = '', status = 'todo', priority = 'medium',
   return task;
 };
 
+// FIX: only whitelisted fields can be changed (id / createdAt are protected)
 const update = (id, fields) => {
   const index = tasks.findIndex((t) => t.id === id);
   if (index === -1) return null;
 
-  const updated = { ...tasks[index], ...fields };
+  const safeFields = {};
+  UPDATABLE_FIELDS.forEach((key) => {
+    if (fields[key] !== undefined) safeFields[key] = fields[key];
+  });
+
+  const updated = { ...tasks[index], ...safeFields };
   tasks[index] = updated;
   return updated;
 };
@@ -60,18 +70,27 @@ const remove = (id) => {
   return true;
 };
 
+// FIX: no longer resets priority to 'medium'
 const completeTask = (id) => {
   const task = findById(id);
   if (!task) return null;
 
   const updated = {
     ...task,
-    priority: 'medium',
     status: 'done',
     completedAt: new Date().toISOString(),
   };
 
   const index = tasks.findIndex((t) => t.id === id);
+  tasks[index] = updated;
+  return updated;
+};
+
+const assignTask = (id, assignee) => {
+  const index = tasks.findIndex((t) => t.id === id);
+  if (index === -1) return null;
+
+  const updated = { ...tasks[index], assignee };
   tasks[index] = updated;
   return updated;
 };
@@ -90,5 +109,6 @@ module.exports = {
   update,
   remove,
   completeTask,
+  assignTask,
   _reset,
 };
